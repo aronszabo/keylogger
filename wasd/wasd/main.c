@@ -1,74 +1,114 @@
 #include "keylogger.h"
+#include <unistd.h>
+#include <pthread.h>
+const int SCREENW=1024;
+const int SCREENH=768;
+const int SCREENCx=SCREENW/2;
+const int SCREENCy=SCREENH/2;
 
+int mousex=SCREENCx;
+int mousey=SCREENCy;
+bool stop=true;
+void* mouseLoop(void *arg)
+{
+    while(true){
+        usleep(10000);
+        if (stop) continue;
+        CGEventRef move1 = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved,CGPointMake(mousex, mousey),kCGMouseButtonLeft);
+        CGEventPost(kCGHIDEventTap, move1);
+        
+    }
+    return NULL;
+}
 int main(int argc, const char *argv[]) {
-
+    
     // Create an event tap to retrieve keypresses.
-    CGEventMask eventMask = (CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventFlagsChanged));
+    CGEventMask eventMask = (CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged));
     CFMachPortRef eventTap = CGEventTapCreate(
-        kCGSessionEventTap, kCGHeadInsertEventTap, 0, eventMask, CGEventCallback, NULL
-    );
-
+                                              kCGSessionEventTap, kCGHeadInsertEventTap, 0, eventMask, CGEventCallback, NULL
+                                              );
+    
     // Exit the program if unable to create the event tap.
     if(!eventTap) {
         fprintf(stderr, "ERROR: Unable to create event tap.\n");
         exit(1);
     }
-
+    
     // Create a run loop source and add enable the event tap.
     CFRunLoopSourceRef runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0);
     CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, kCFRunLoopCommonModes);
     CGEventTapEnable(eventTap, true);
-
-
-    // Clear the logfile if clear argument used or log to specific file if given.
-    if(argc == 2) {
-        if(strcmp(argv[1], "clear") == 0) {
-            fopen(logfileLocation, "w");
-            printf("%s cleared.\n", logfileLocation);
-            fflush(stdout);
-            exit(1);
-        } else {
-            logfileLocation = argv[1];
-        }
-    }
-
+    
+    
     // Get the current time and open the logfile.
-    time_t result = time(NULL);
-    logfile = fopen(logfileLocation, "a");
-
-    if (!logfile) {
-        fprintf(stderr, "ERROR: Unable to open log file. Ensure that you have the proper permissions.\n");
-        exit(1);
-    }
-
+    //logfile = fopen(logfileLocation, "a");
+    
+    //if (!logfile) {
+    //    printf("ERROR: Unable to open log file. Ensure that you have the proper permissions.\n");
+    //    exit(1);
+    //}
+    
     // Output to logfile.
-    fprintf(logfile, "\n\nKeylogging has begun.\n%s\n", asctime(localtime(&result)));
-    fflush(logfile);
-
-    // Display the location of the logfile and start the loop.
-    printf("Logging to: %s\n", logfileLocation);
+        // Display the location of the logfile and start the loop.
     fflush(stdout);
+    pthread_t thread;
+    pthread_create(&(thread), NULL, &mouseLoop, NULL);
     CFRunLoopRun();
-
+    
     return 0;
 }
 
 // The following callback method is invoked on every keypress.
 CGEventRef CGEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
-    if (type != kCGEventKeyDown && type != kCGEventFlagsChanged && type != kCGEventKeyUp) { return event; }
-
+    //if (type != kCGEventKeyDown && type != kCGEventFlagsChanged && type != kCGEventKeyUp) { return event; }
+    
     // Retrieve the incoming keycode.
     CGKeyCode keyCode = (CGKeyCode) CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-
+    if(type == kCGEventKeyDown){
+        switch(keyCode){
+            case 13: //w
+                mousey=0;
+                break;
+            case 0: //a
+                mousex=0;
+                break;
+            case 1: //s
+                mousey=SCREENH;
+                break;
+            case 2: //d
+                mousex=SCREENW;
+                break;
+            case 12: //q
+                stop=!stop;
+                
+        }
+    }
+    if(type == kCGEventKeyUp){
+        switch(keyCode){
+            case 13: //w
+                mousey=SCREENCy;
+                break;
+            case 0: //a
+                mousex=SCREENCx;
+                break;
+            case 1: //s
+                mousey=SCREENCy;
+                break;
+            case 2: //d
+                mousex=SCREENCx;
+                break;
+                
+                
+        }
+    }
     // Print the human readable key to the logfile.
-    fprintf(logfile, "%s", convertKeyCode(keyCode));
-    fflush(logfile);
-
+    
     return event;
 }
 
 // The following method converts the key code returned by each keypress as
 // a human readable key code in const char format.
+/*
 const char *convertKeyCode(int keyCode) {
     switch ((int) keyCode) {
         case 0:   return "a";
@@ -187,3 +227,4 @@ const char *convertKeyCode(int keyCode) {
     }
     return "[unknown]";
 }
+*/
